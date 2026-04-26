@@ -1,0 +1,6 @@
+{
+  "name": "CPU Scheduler Visualizer",
+  "description": "An interactive tool to visualize CPU scheduling algorithms including FCFS, SJF, and Round Robin with dynamic Gantt charts and performance metrics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
