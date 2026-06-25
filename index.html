@@ -1,13 +1,581 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scevi Processes | CPU Scheduling Visualizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["Poppins", "sans-serif"],
+          },
+          boxShadow: {
+            soft: "0 20px 60px rgba(15, 23, 42, 0.12)",
+          },
+          keyframes: {
+            rise: {
+              "0%": { opacity: "0", transform: "translateY(18px)" },
+              "100%": { opacity: "1", transform: "translateY(0)" },
+            },
+            grow: {
+              "0%": { opacity: "0", transform: "scaleX(0.92)" },
+              "100%": { opacity: "1", transform: "scaleX(1)" },
+            },
+          },
+          animation: {
+            rise: "rise 0.45s ease-out forwards",
+            grow: "grow 0.5s ease-out forwards",
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 28%),
+        radial-gradient(circle at top right, rgba(16, 185, 129, 0.14), transparent 24%),
+        linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    }
 
+    .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(18px);
+    }
+
+    .gantt-block {
+      min-width: 88px;
+      position: relative;
+      transform-origin: left center;
+    }
+
+    .gantt-block::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 1rem;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      pointer-events: none;
+    }
+
+    .gantt-track::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .gantt-track::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.75);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen font-sans text-slate-800 antialiased">
+  <main class="mx-auto flex min-h-screen max-w-7xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+    <div class="grid w-full gap-6 lg:grid-cols-[1.05fr_1.2fr]">
+      <section class="glass-card rounded-3xl border border-white/60 p-6 shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:p-8">
+        <div class="mb-8">
+          <span class="inline-flex items-center rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-sky-700">OS Lab Ready</span>
+          <h1 class="mt-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Scevi Processes</h1>
+          <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+            Interactive CPU Scheduling Visualizer for FCFS, SJF, and Round Robin with live metrics, animated Gantt chart rendering, and clean lab-submission styling.
+          </p>
+        </div>
+
+        <div class="space-y-6">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">Number of Processes</span>
+              <input id="processCount" type="number" min="1" max="12" value="4" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100" />
+            </label>
+
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">Scheduling Algorithm</span>
+              <select id="algorithm" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100">
+                <option value="fcfs">FCFS (Non-preemptive)</option>
+                <option value="sjf">SJF (Non-preemptive)</option>
+                <option value="rr">Round Robin</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="timeQuantumWrapper" class="hidden">
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-700">Time Quantum</span>
+              <input id="timeQuantum" type="number" min="1" value="2" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100" />
+            </label>
+          </div>
+
+          <div class="flex flex-wrap gap-3">
+            <button id="generateBtn" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/15 transition duration-300 hover:-translate-y-0.5 hover:bg-slate-800">Generate Inputs</button>
+            <button id="runBtn" class="rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-600/20 transition duration-300 hover:-translate-y-0.5 hover:bg-sky-500">Run Simulation</button>
+            <button id="resetBtn" class="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition duration-300 hover:-translate-y-0.5 hover:border-rose-200 hover:text-rose-600">Reset</button>
+          </div>
+
+          <div id="errorBox" class="hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"></div>
+
+          <div class="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+            <div class="mb-4 flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-slate-900">Process Input Panel</h2>
+              <span class="text-xs font-medium uppercase tracking-[0.24em] text-slate-400">Dynamic Fields</span>
+            </div>
+            <div id="processInputs" class="space-y-4"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="glass-card rounded-3xl border border-white/60 p-6 shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-2xl sm:p-8">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="text-2xl font-bold tracking-tight text-slate-900">Simulation Output</h2>
+            <p class="mt-2 text-sm text-slate-600">View the execution sequence, timing metrics, and process timeline in one place.</p>
+          </div>
+          <span id="statusBadge" class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Waiting</span>
+        </div>
+
+        <div class="mt-8 grid gap-4 sm:grid-cols-2">
+          <div class="rounded-3xl bg-slate-900 p-5 text-white shadow-lg shadow-slate-900/10">
+            <p class="text-xs uppercase tracking-[0.22em] text-slate-300">Average Waiting Time</p>
+            <p id="avgWaiting" class="mt-3 text-3xl font-bold">0.00</p>
+          </div>
+          <div class="rounded-3xl bg-emerald-500 p-5 text-white shadow-lg shadow-emerald-500/20">
+            <p class="text-xs uppercase tracking-[0.22em] text-emerald-100">Average Turnaround Time</p>
+            <p id="avgTurnaround" class="mt-3 text-3xl font-bold">0.00</p>
+          </div>
+        </div>
+
+        <div class="mt-8 rounded-3xl border border-slate-200 bg-white/80 p-5">
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-slate-900">Gantt Chart</h3>
+            <span class="text-xs uppercase tracking-[0.22em] text-slate-400">Animated Timeline</span>
+          </div>
+          <div id="ganttChart" class="gantt-track overflow-x-auto pb-2">
+            <p class="text-sm text-slate-500">Run a simulation to generate the timeline.</p>
+          </div>
+        </div>
+
+        <div class="mt-6 rounded-3xl border border-slate-200 bg-white/80 p-5">
+          <div class="mb-4 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-slate-900">Execution Table</h3>
+            <span class="text-xs uppercase tracking-[0.22em] text-slate-400">Process Metrics</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full overflow-hidden rounded-2xl text-left text-sm">
+              <thead class="bg-slate-100 text-slate-600">
+                <tr>
+                  <th class="px-4 py-3 font-semibold">Process</th>
+                  <th class="px-4 py-3 font-semibold">Arrival</th>
+                  <th class="px-4 py-3 font-semibold">Burst</th>
+                  <th class="px-4 py-3 font-semibold">Completion</th>
+                  <th class="px-4 py-3 font-semibold">Turnaround</th>
+                  <th class="px-4 py-3 font-semibold">Waiting</th>
+                </tr>
+              </thead>
+              <tbody id="resultTable" class="divide-y divide-slate-100 bg-white"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const palette = [
+      "from-sky-500 to-blue-600",
+      "from-emerald-500 to-teal-600",
+      "from-amber-400 to-orange-500",
+      "from-fuchsia-500 to-pink-600",
+      "from-violet-500 to-purple-600",
+      "from-rose-500 to-red-500",
+      "from-cyan-500 to-sky-500",
+      "from-lime-500 to-green-600",
+      "from-indigo-500 to-blue-700",
+      "from-yellow-400 to-amber-500",
+      "from-pink-500 to-rose-600",
+      "from-slate-600 to-slate-800",
+    ];
+
+    const processInputs = document.getElementById("processInputs");
+    const errorBox = document.getElementById("errorBox");
+    const algorithmSelect = document.getElementById("algorithm");
+    const timeQuantumWrapper = document.getElementById("timeQuantumWrapper");
+    const statusBadge = document.getElementById("statusBadge");
+
+    document.getElementById("generateBtn").addEventListener("click", generateInputs);
+    document.getElementById("runBtn").addEventListener("click", runSimulation);
+    document.getElementById("resetBtn").addEventListener("click", resetApp);
+    algorithmSelect.addEventListener("change", toggleTimeQuantum);
+
+    generateInputs();
+    toggleTimeQuantum();
+
+    function toggleTimeQuantum() {
+      timeQuantumWrapper.classList.toggle("hidden", algorithmSelect.value !== "rr");
+    }
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.classList.remove("hidden");
+    }
+
+    function clearError() {
+      errorBox.classList.add("hidden");
+      errorBox.textContent = "";
+    }
+
+    function generateInputs() {
+      clearError();
+      const count = Number(document.getElementById("processCount").value);
+
+      if (!Number.isInteger(count) || count < 1 || count > 12) {
+        showError("Enter a valid process count between 1 and 12.");
+        return;
+      }
+
+      processInputs.innerHTML = "";
+
+      for (let i = 0; i < count; i++) {
+        const row = document.createElement("div");
+        row.className = "grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-md sm:grid-cols-[110px_1fr_1fr]";
+        row.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-2xl bg-gradient-to-br ${palette[i % palette.length]}"></div>
+            <div>
+              <p class="text-sm font-semibold text-slate-900">P${i + 1}</p>
+              <p class="text-xs text-slate-500">Process ${i + 1}</p>
+            </div>
+          </div>
+          <label class="block">
+            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Arrival Time</span>
+            <input type="number" min="0" data-field="arrival" data-index="${i}" value="${i === 0 ? 0 : i}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100" />
+          </label>
+          <label class="block">
+            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Burst Time</span>
+            <input type="number" min="1" data-field="burst" data-index="${i}" value="${i + 2}" class="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100" />
+          </label>
+        `;
+        processInputs.appendChild(row);
+      }
+
+      statusBadge.textContent = "Inputs Ready";
+      statusBadge.className = "rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-sky-700";
+    }
+
+    function collectProcesses() {
+      const count = Number(document.getElementById("processCount").value);
+      const processes = [];
+
+      for (let i = 0; i < count; i++) {
+        const arrivalInput = document.querySelector(`[data-field="arrival"][data-index="${i}"]`);
+        const burstInput = document.querySelector(`[data-field="burst"][data-index="${i}"]`);
+
+        if (!arrivalInput || !burstInput || arrivalInput.value === "" || burstInput.value === "") {
+          throw new Error("Please fill in all Arrival Time and Burst Time fields.");
+        }
+
+        const arrivalTime = Number(arrivalInput.value);
+        const burstTime = Number(burstInput.value);
+
+        if (arrivalTime < 0 || burstTime <= 0 || Number.isNaN(arrivalTime) || Number.isNaN(burstTime)) {
+          throw new Error("Arrival Time must be 0 or greater, and Burst Time must be greater than 0.");
+        }
+
+        processes.push({
+          id: `P${i + 1}`,
+          arrivalTime,
+          burstTime,
+          color: palette[i % palette.length],
+        });
+      }
+
+      return processes;
+    }
+
+    function runSimulation() {
+      clearError();
+
+      try {
+        const processes = collectProcesses();
+        const algorithm = algorithmSelect.value;
+        let result;
+
+        if (algorithm === "fcfs") {
+          result = fcfs(processes);
+        } else if (algorithm === "sjf") {
+          result = sjf(processes);
+        } else {
+          const quantum = Number(document.getElementById("timeQuantum").value);
+          if (!Number.isInteger(quantum) || quantum <= 0) {
+            throw new Error("Time Quantum must be a positive integer for Round Robin.");
+          }
+          result = roundRobin(processes, quantum);
+        }
+
+        const metrics = calculateMetrics(result.processes);
+        renderResults(result.processes, result.timeline, metrics);
+
+        statusBadge.textContent = `${algorithm.toUpperCase()} Complete`;
+        statusBadge.className = "rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700";
+      } catch (error) {
+        showError(error.message);
+        statusBadge.textContent = "Validation Error";
+        statusBadge.className = "rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-rose-700";
+      }
+    }
+
+    function fcfs(processes) {
+      const ordered = [...processes].sort((a, b) => a.arrivalTime - b.arrivalTime || a.id.localeCompare(b.id));
+      const timeline = [];
+      let currentTime = 0;
+
+      ordered.forEach((process) => {
+        if (currentTime < process.arrivalTime) {
+          timeline.push(createIdleBlock(currentTime, process.arrivalTime));
+          currentTime = process.arrivalTime;
+        }
+
+        const startTime = currentTime;
+        const completionTime = startTime + process.burstTime;
+        currentTime = completionTime;
+
+        timeline.push({
+          id: process.id,
+          start: startTime,
+          end: completionTime,
+          duration: process.burstTime,
+          color: process.color,
+        });
+
+        process.startTime = startTime;
+        process.completionTime = completionTime;
+        process.turnaroundTime = completionTime - process.arrivalTime;
+        process.waitingTime = process.turnaroundTime - process.burstTime;
+      });
+
+      return { processes: ordered, timeline };
+    }
+
+    function sjf(processes) {
+      const pending = [...processes].sort((a, b) => a.arrivalTime - b.arrivalTime || a.id.localeCompare(b.id));
+      const completed = [];
+      const timeline = [];
+      let currentTime = 0;
+
+      while (pending.length > 0) {
+        const available = pending.filter((process) => process.arrivalTime <= currentTime);
+
+        if (available.length === 0) {
+          const nextArrival = pending[0].arrivalTime;
+          timeline.push(createIdleBlock(currentTime, nextArrival));
+          currentTime = nextArrival;
+          continue;
+        }
+
+        const nextProcess = available.sort((a, b) =>
+          a.burstTime - b.burstTime || a.arrivalTime - b.arrivalTime || a.id.localeCompare(b.id)
+        )[0];
+        const selectedIndex = pending.findIndex((process) => process.id === nextProcess.id);
+        const [process] = pending.splice(selectedIndex, 1);
+
+        const startTime = currentTime;
+        const completionTime = startTime + process.burstTime;
+        currentTime = completionTime;
+
+        timeline.push({
+          id: process.id,
+          start: startTime,
+          end: completionTime,
+          duration: process.burstTime,
+          color: process.color,
+        });
+
+        process.startTime = startTime;
+        process.completionTime = completionTime;
+        process.turnaroundTime = completionTime - process.arrivalTime;
+        process.waitingTime = process.turnaroundTime - process.burstTime;
+
+        completed.push(process);
+      }
+
+      return {
+        processes: completed.sort((a, b) => a.id.localeCompare(b.id)),
+        timeline,
+      };
+    }
+
+    function roundRobin(processes, quantum) {
+      const sorted = [...processes].sort((a, b) => a.arrivalTime - b.arrivalTime || a.id.localeCompare(b.id));
+      const timeline = [];
+      const queue = [];
+      const enriched = sorted.map((process) => ({
+        ...process,
+        remainingTime: process.burstTime,
+      }));
+
+      let currentTime = 0;
+      let pointer = 0;
+      let completedCount = 0;
+
+      while (completedCount < enriched.length) {
+        while (pointer < enriched.length && enriched[pointer].arrivalTime <= currentTime) {
+          queue.push(enriched[pointer]);
+          pointer++;
+        }
+
+        if (queue.length === 0) {
+          const nextArrival = enriched[pointer].arrivalTime;
+          timeline.push(createIdleBlock(currentTime, nextArrival));
+          currentTime = nextArrival;
+          continue;
+        }
+
+        const process = queue.shift();
+        const startTime = currentTime;
+        const slice = Math.min(quantum, process.remainingTime);
+        currentTime += slice;
+        process.remainingTime -= slice;
+
+        timeline.push({
+          id: process.id,
+          start: startTime,
+          end: currentTime,
+          duration: slice,
+          color: process.color,
+        });
+
+        while (pointer < enriched.length && enriched[pointer].arrivalTime <= currentTime) {
+          queue.push(enriched[pointer]);
+          pointer++;
+        }
+
+        if (process.remainingTime > 0) {
+          queue.push(process);
+        } else {
+          process.completionTime = currentTime;
+          process.turnaroundTime = process.completionTime - process.arrivalTime;
+          process.waitingTime = process.turnaroundTime - process.burstTime;
+          completedCount++;
+        }
+      }
+
+      return {
+        processes: enriched.map(({ remainingTime, ...process }) => process).sort((a, b) => a.id.localeCompare(b.id)),
+        timeline,
+      };
+    }
+
+    function createIdleBlock(start, end) {
+      return {
+        id: "Idle",
+        start,
+        end,
+        duration: end - start,
+        color: "from-slate-300 to-slate-400",
+      };
+    }
+
+    function calculateMetrics(processes) {
+      const totalWaiting = processes.reduce((sum, process) => sum + process.waitingTime, 0);
+      const totalTurnaround = processes.reduce((sum, process) => sum + process.turnaroundTime, 0);
+
+      return {
+        averageWaitingTime: totalWaiting / processes.length,
+        averageTurnaroundTime: totalTurnaround / processes.length,
+      };
+    }
+
+    function renderResults(processes, timeline, metrics) {
+      document.getElementById("avgWaiting").textContent = metrics.averageWaitingTime.toFixed(2);
+      document.getElementById("avgTurnaround").textContent = metrics.averageTurnaroundTime.toFixed(2);
+      renderTable(processes);
+      renderGantt(timeline);
+    }
+
+    function renderTable(processes) {
+      const tableBody = document.getElementById("resultTable");
+      tableBody.innerHTML = "";
+
+      processes.forEach((process, index) => {
+        const row = document.createElement("tr");
+        row.className = "animate-rise";
+        row.style.animationDelay = `${index * 70}ms`;
+        row.innerHTML = `
+          <td class="px-4 py-3 font-semibold text-slate-900">${process.id}</td>
+          <td class="px-4 py-3 text-slate-600">${process.arrivalTime}</td>
+          <td class="px-4 py-3 text-slate-600">${process.burstTime}</td>
+          <td class="px-4 py-3 text-slate-600">${process.completionTime}</td>
+          <td class="px-4 py-3 text-slate-600">${process.turnaroundTime}</td>
+          <td class="px-4 py-3 text-slate-600">${process.waitingTime}</td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    function renderGantt(timeline) {
+      const ganttChart = document.getElementById("ganttChart");
+      ganttChart.innerHTML = "";
+
+      if (timeline.length === 0) {
+        ganttChart.innerHTML = '<p class="text-sm text-slate-500">Run a simulation to generate the timeline.</p>';
+        return;
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "min-w-max";
+
+      const blocksRow = document.createElement("div");
+      blocksRow.className = "flex items-stretch gap-3";
+
+      const timeRow = document.createElement("div");
+      timeRow.className = "mt-3 flex items-center gap-3 text-xs font-semibold text-slate-500";
+
+      timeline.forEach((block, index) => {
+        const width = Math.max(block.duration * 54, 88);
+
+        const segment = document.createElement("div");
+        segment.className = `gantt-block animate-grow rounded-3xl bg-gradient-to-br ${block.color} px-4 py-4 text-white shadow-lg`;
+        segment.style.width = `${width}px`;
+        segment.style.animationDelay = `${index * 90}ms`;
+        segment.innerHTML = `
+          <p class="text-sm font-semibold">${block.id}</p>
+          <p class="mt-1 text-xs text-white/85">Start ${block.start} | End ${block.end}</p>
+        `;
+        blocksRow.appendChild(segment);
+
+        const timeMarker = document.createElement("div");
+        timeMarker.style.width = `${width}px`;
+        timeMarker.innerHTML = `
+          <div class="flex justify-between">
+            <span>${block.start}</span>
+            <span>${block.end}</span>
+          </div>
+        `;
+        timeRow.appendChild(timeMarker);
+      });
+
+      wrapper.appendChild(blocksRow);
+      wrapper.appendChild(timeRow);
+      ganttChart.appendChild(wrapper);
+    }
+
+    function resetApp() {
+      document.getElementById("processCount").value = 4;
+      document.getElementById("algorithm").value = "fcfs";
+      document.getElementById("timeQuantum").value = 2;
+      document.getElementById("avgWaiting").textContent = "0.00";
+      document.getElementById("avgTurnaround").textContent = "0.00";
+      document.getElementById("resultTable").innerHTML = "";
+      document.getElementById("ganttChart").innerHTML = "";
+      statusBadge.textContent = "Waiting";
+      statusBadge.className = "rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500";
+      clearError();
+      toggleTimeQuantum();
+      generateInputs();
+    }
+  </script>
+</body>
+</html>

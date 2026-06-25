@@ -1,6 +1,9 @@
 node_modules/
 build/
 dist/
+!dist/Scevi-Processes-Setup-1.0.0.exe
+!dist/Scevi-Processes-Setup-1.0.0.exe.blockmap
+!dist/builder-debug.yml
 coverage/
 .DS_Store
 *.log
