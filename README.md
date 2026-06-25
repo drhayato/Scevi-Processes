@@ -57,4 +57,4 @@ Processes are executed in time slices using the provided time quantum.
 
 ## Intended Use
 
-This project is designed to be professional, interactive, and suitable for a B.Tech Operating Systems lab submission.
+This project is designed to be professional, interactive, and suitable for a Personal Academic Purpose.
