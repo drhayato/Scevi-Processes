@@ -24,7 +24,7 @@ Scevi Processes is a CPU Scheduling Visualizer built for OS lab submissions. It 
 - `package.json` - build and packaging configuration
 - `dist/` - generated Windows installer artifacts
 
-## Run Locally
+## Run Locally (for developers)
 
 ### Desktop app
 
